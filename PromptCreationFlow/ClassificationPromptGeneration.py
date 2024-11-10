@@ -40,19 +40,21 @@ def GenerateClassificationPrompt(df, column_name, classification_request, classe
         "Generate a JSON object with two keys: 'system_message' and 'user_message'.\n"
         "The 'system_message' should instruct the assistant on how to classify unstructured notes based on the following criteria:\n\n"
         f"Classification Request: {classification_request}\n\n"
-        f"Classification Classes: {', '.join([f'{cls} ({i})' for i, cls in enumerate(classes)])}\n\n"
+        f"Classification Classes: {', '.join([f'CLASS {i} NAME: {cls}' for i, cls in enumerate(classes)])}\n\n"
         "Use the style of the following example for structure, tone, and clarity:\n\n"
         "System example:\n"
-        "\"You are an expert in [COMPLETE ACCORDING TO CONTEXT HERE] specializing in [COMPLETE ACCORDING TO CONTEXT HERE]. \n\n "
-        "Your task is to analyze the data provided and determine [COMPLETE ACCORDING TO CONTEXT HERE Classification Request and Classification Classes] \n\n"
-        "Consider all relevant information in the data and only in the provided data. [ADD ANY SPECIFIC EXAMPLE DETAILS AND INFO THAT CNA BE RELEVANT FROM THE NOTES YOU SEE] \"\n\n"
+        "\"You are an expert in [COMPLETE ACCORDING TO CONTEXT HERE] specializing in [COMPLETE ACCORDING TO CLASSIFICATION REQUEST HERE]. \n\n "
+        "Your task is to analyze the data provided and determine [COMPLETE ACCORDING TO CONTEXT HERE CLASSIFICATION REQUEST AND CLASSIFICATION CLASSES] \n\n"
+        "Consider all relevant information in the data and only in the provided data. [ADD ANY SPECIFIC EXAMPLE DETAILS AND INFO THAT CAN BE RELEVANT FROM THE EXAMPLES YOU SEE] "
+        "Provide your answer as [Explanation here] [CLASS 0 NAME HERE], [CLASS 1 NAME HERE], ...[CLASS K NAME HERE] and appropriate number 0 if the answer is [CLASS 0], 1 if the answer is [CLASS 1 NAME HERE] and so on.\"\n\n"
         "User example:\n"
         "\"You are a [COMPLETE ACCORDING TO CONTEXT HERE]. Please analyze the following free text data provided and determine [COMPLETE ACCORDING TO CLASSIFICATION CONTEXT HERE]\"\n\n"
-        "Provide 10 sample unstructured notes below to use in the prompt generation:\n"
+        "MAKE SURE TO END YOUR RESPONSE WITH THE NUMBER ONLY. \n\n"
+        "Provided below are 10 sample unstructured notes to use in the prompt generation for enriching the prompt and providing examples inside the prompt: \n\n"
     )
 
     for idx, note in enumerate(sample_notes, start=1):
-        user_message_content += f"\nExample {idx}: \"{note}\""
+        user_message_content += f"\nExample {idx}: \"{note}\" \n"
 
     # System message
     system_message = {
