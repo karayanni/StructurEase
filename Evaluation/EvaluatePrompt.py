@@ -28,10 +28,13 @@ async def exponential_backoff_retry(func, max_retries=4, initial_delay=1, max_de
             logging.error(f"Retrying after {delay} seconds... (Attempt {retries}/{max_retries})")
 
 
-async def is_wearing_helmet(clinical_note: str, system_prompt: str, user_prompt: str):
+async def classification_using_llm(clinical_note: str, system_prompt: str, user_prompt: str):
     # Initialize the OpenAI client
     client = AsyncOpenAI()
     message_list = []
+
+    # todo: consider adding a wrapper to the provided prompt to ensure the LLM returns a valid response ending with a number.
+    ensure_end_in_number = f"\n\n MAKE SURE YOU END YOUR RESPONSE WITH THE NUMBER THAT CORRESPONDS THE THE CLASS. \n\n"
 
     system_message = {
         "role": "system",
@@ -40,7 +43,7 @@ async def is_wearing_helmet(clinical_note: str, system_prompt: str, user_prompt:
 
     user_message = {
         "role": "user",
-        "content": user_prompt + f"\n\n Here is the Clinical Note: \n\n \"{clinical_note}\""
+        "content": user_prompt + ensure_end_in_number + f"\n\n Here is the Clinical Note: \n\n \"{clinical_note}\""
 
     }
 
@@ -72,13 +75,28 @@ async def process_clinical_note(semaphore, row, system_prompt: str, user_prompt:
 
     async with semaphore:
         clinical_note = row['Narrative_1']
-        response = await is_wearing_helmet(clinical_note, system_prompt, user_prompt)
+        response = await classification_using_llm(clinical_note, system_prompt, user_prompt)
         # Extract the last character, which should be 0, 1, or 2
         last_char = response.strip()[-1]
+
+        if not last_char.isdigit():
+            logging.error(
+                f"Unexpected response format. Response: {response}, System Prompt: {system_prompt}, User Prompt: {user_prompt}")
+            print(f"Error: Unexpected response format. Response: {response}")
+            print(f"System Prompt: {system_prompt}")
+            print(f"User Prompt: {user_prompt}")
+            return response, None  # Return None to indicate an invalid response
+
         return response, last_char
 
 
 async def start_eval(system_prompt: str, user_prompt: str):
+    """
+    This function reads the NEISS data, processes the clinical notes, and classifies the helmet status using the provided prompts.
+    :param system_prompt: The system prompt to instruct the assistant on how to classify the helmet status.
+    :param user_prompt:  The user prompt to provide context and request the classification of the helmet status.
+    :return: Saves the processed data to a new CSV file.
+    """
     # Read the CSV file
     df = pd.read_csv('NEISS data/neiss_filtered_labeled.csv')
 

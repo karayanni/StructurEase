@@ -31,37 +31,40 @@ def main():
         classes = [item.strip() for item in qualification_classes.split(',') if item.strip()]
 
         if len(classes) >= 2:
-            st.subheader("Manual Labeling for Sampled Data")
+            if len(classes) > 9:
+                st.warning("Please add at most 9 classes.")
+            else:
+                st.subheader("Manual Labeling for Sampled Data")
 
-            # Sample K random rows from the selected column
-            # todo: instead of sampling 10 rows randomly, run a first pass of the model to get the most 'uncertain'ish rows
-            # todo: make this sampling a function and give it a good name to explain in the paper.
-            sampled_data = df[column_name].sample(10, random_state=42).reset_index(drop=True)
-            labels = []
+                # Sample K random rows from the selected column
+                # todo: instead of sampling 10 rows randomly, run a first pass of the model to get the most 'uncertain'ish rows
+                # todo: make this sampling a function and give it a good name to explain in the paper.
+                sampled_data = df[column_name].sample(10, random_state=42).reset_index(drop=True)
+                labels = []
 
-            # Create a form to label the sampled rows
-            with st.form("labeling_form"):
-                st.write("Please label each row below:")
+                # Create a form to label the sampled rows
+                with st.form("labeling_form"):
+                    st.write("Please label each row below:")
 
-                for i, row in enumerate(sampled_data):
-                    label = st.selectbox(f"Row {i + 1}: {row}", options=classes, key=f"label_{i}")
-                    labels.append(label)
+                    for i, row in enumerate(sampled_data):
+                        label = st.selectbox(f"Row {i + 1}: {row}", options=classes, key=f"label_{i}")
+                        labels.append(label)
 
-                submit_labels = st.form_submit_button("Submit Labels")
+                    submit_labels = st.form_submit_button("Submit Labels")
 
-            if submit_labels:
-                labeled_data = pd.DataFrame({"Sampled Text": sampled_data, "Label": labels})
-                st.write("Labeled Data Preview:")
-                st.write(labeled_data)
-            # Step 5: Submit button
-            if st.button("Submit"):
-                # Call a function with these parameters
-                st.write("CSV Column Selected:", column_name)
-                st.write("Classification Request:", classification_request)
-                st.write("Qualification Classes:", classes)
+                if submit_labels:
+                    labeled_data = pd.DataFrame({"Sampled Text": sampled_data, "Label": labels})
+                    st.write("Labeled Data Preview:")
+                    st.write(labeled_data)
+                # Step 5: Submit button
+                if st.button("Submit"):
+                    # Call a function with these parameters
+                    st.write("CSV Column Selected:", column_name)
+                    st.write("Classification Request:", classification_request)
+                    st.write("Qualification Classes:", classes)
 
-                # Placeholder for your function
-                st.write(GenerateClassificationPrompt(df, column_name, classification_request, classes))
+                    # Placeholder for your function
+                    st.write(GenerateClassificationPrompt(df, column_name, classification_request, classes))
         else:
             st.warning("Please enter at least two qualification classes.")
 
