@@ -3,6 +3,7 @@ import pandas as pd
 
 from PromptCreationFlow.ChooseLabelingData import ChooseLabelingData
 from PromptCreationFlow.ClassificationPromptGeneration import InitialGenerateClassificationPrompt
+from PromptCreationFlow.EvaluateCurrentPrompt import EvaluateCurrentPrompt
 
 
 def main():
@@ -47,7 +48,6 @@ def main():
                     st.session_state.all_labeled_data = pd.DataFrame(columns=["Sampled Text", "Label"])
                     st.session_state.already_chosen_data_indices = []
 
-                # Create a form to label the sampled rows
                 with st.form(f"labeling_form_0"):
                     # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                     if "sample_0" not in st.session_state:
@@ -78,7 +78,14 @@ def main():
                             f"Evaluation of Prompt_{st.session_state.current_iteration} on the manually Labeled Data")
 
                         # STEP 3 - Return Evaluation of the Labeled Data to User
-                        # todo: add here the evaluation function call...
+                        eval_report, misclassified = EvaluateCurrentPrompt(st.session_state.current_prompt["system_message"],
+                                              st.session_state.current_prompt["user_message"],
+                                              st.session_state.all_labeled_data,
+                                              classes)
+
+                        st.write(eval_report)
+                        st.write("Misclassified notes: ")
+                        st.write(misclassified)
 
                         # STEP 4 - Update the Prompt with the Labeled Data as Few-Shot Learning
                         # todo: add here the prompt update function call...
@@ -120,13 +127,19 @@ def main():
                                 f"Evaluation of Prompt_{st.session_state.current_iteration} on the manually Labeled Data")
 
                             # STEP 3 - Return Evaluation of the Labeled Data to User
-                            # todo: add here the evaluation function call...
+                            eval_report, misclassified = EvaluateCurrentPrompt(
+                                st.session_state.current_prompt["system_message"],
+                                st.session_state.current_prompt["user_message"],
+                                st.session_state.all_labeled_data,
+                                classes)
 
+                            st.write(eval_report)
+                            st.write("Misclassified notes: ")
+                            st.write(misclassified)
                             # STEP 4 - Update the Prompt with the Labeled Data as Few-Shot Learning
                             # todo: add here the prompt update function call...
 
                             st.session_state.current_iteration += 1
-
                 # Hardcoded up to 2 iterations of manual labeling.
                 if st.session_state.current_iteration > 1:
                     with st.form(f"labeling_form_2"):
@@ -163,8 +176,15 @@ def main():
                                 f"Evaluation of Prompt_{st.session_state.current_iteration} on the manually Labeled Data")
 
                             # STEP 3 - Return Evaluation of the Labeled Data to User
-                            # todo: add here the evaluation function call...
+                            eval_report, misclassified = EvaluateCurrentPrompt(
+                                st.session_state.current_prompt["system_message"],
+                                st.session_state.current_prompt["user_message"],
+                                st.session_state.all_labeled_data,
+                                classes)
 
+                            st.write(eval_report)
+                            st.write("Misclassified notes: ")
+                            st.write(misclassified)
                             # STEP 4 - Update the Prompt with the Labeled Data as Few-Shot Learning
                             # todo: add here the prompt update function call...
 
@@ -175,7 +195,7 @@ def main():
                     # Call a function with these parameters
                     st.write(f"Final Classification Prompt: {st.session_state.current_prompt}")
 
-                    # todo: add here the final classification function call...
+                    # todo: add final evaluation function call here...
                     st.write("Final Classification Started")
 
         else:

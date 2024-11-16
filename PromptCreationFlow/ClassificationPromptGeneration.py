@@ -1,5 +1,4 @@
-import pandas as pd
-import asyncio
+import json
 import random
 import time
 import logging
@@ -35,26 +34,33 @@ def InitialGenerateClassificationPrompt(df, column_name, classification_request,
     train_df, _ = train_test_split(df, test_size=0.2, random_state=42)
     sample_notes = train_df[column_name].sample(10, random_state=42).tolist()
 
-    # Construct message to request a classification prompt generation
+    # TODO: Improve the prompt by adding think step by step and adding the explanation before the answer.
     user_message_content = (
         "Generate a JSON object with two keys: 'system_message' and 'user_message'.\n"
         "The 'system_message' should instruct the assistant on how to classify unstructured notes based on the following criteria:\n\n"
         f"Classification Request: {classification_request}\n\n"
         f"Classification Classes: {', '.join([f'CLASS {i} NAME: {cls}' for i, cls in enumerate(classes)])}\n\n"
-        "Use the style of the following example for structure, tone, and clarity:\n\n"
-        "System example:\n"
+        "Provided below are 10 sample unstructured notes to use in the prompt generation for enriching the prompt and providing examples inside the prompt: \n\n"
+        )
+    for idx, note in enumerate(sample_notes, start=1):
+        user_message_content += f"\nExample {idx}: \"{note}\" \n"
+
+    user_message_content_continuation = (
+        "Use the style of the following example for structure, tone, and clarity.\n\n"
+        "Here is an example to follow - MAKE SURE TO USE THE SAME STRUCTURE:\n\n"
+        "{"
+        "\"system_message\":\n"
         "\"You are an expert in [COMPLETE ACCORDING TO CONTEXT HERE] specializing in [COMPLETE ACCORDING TO CLASSIFICATION REQUEST HERE]. \n\n "
         "Your task is to analyze the data provided and determine [COMPLETE ACCORDING TO CONTEXT HERE CLASSIFICATION REQUEST AND CLASSIFICATION CLASSES] \n\n"
         "Consider all relevant information in the data and only in the provided data. [ADD ANY SPECIFIC EXAMPLE DETAILS AND INFO THAT CAN BE RELEVANT FROM THE EXAMPLES YOU SEE] "
         "Provide your answer as [Explanation here] [CLASS 0 NAME HERE], [CLASS 1 NAME HERE], ...[CLASS K NAME HERE] and appropriate number 0 if the answer is [CLASS 0], 1 if the answer is [CLASS 1 NAME HERE] and so on.\"\n\n"
-        "User example:\n"
+        "\"user_message\":\n"
         "\"You are a [COMPLETE ACCORDING TO CONTEXT HERE]. Please analyze the following free text data provided and determine [COMPLETE ACCORDING TO CLASSIFICATION CONTEXT HERE]\"\n\n"
         "MAKE SURE TO END YOUR RESPONSE WITH THE NUMBER ONLY. \n\n"
-        "Provided below are 10 sample unstructured notes to use in the prompt generation for enriching the prompt and providing examples inside the prompt: \n\n"
+        "}"
     )
 
-    for idx, note in enumerate(sample_notes, start=1):
-        user_message_content += f"\nExample {idx}: \"{note}\" \n"
+    user_message_content += user_message_content_continuation
 
     # System message
     system_message = {
@@ -87,4 +93,6 @@ def InitialGenerateClassificationPrompt(df, column_name, classification_request,
     completion = exponential_backoff_retry(make_completion_request)
     assistant_response = completion.choices[0].message.content.strip()
 
-    return assistant_response
+    response_dict = json.loads(assistant_response)
+
+    return response_dict

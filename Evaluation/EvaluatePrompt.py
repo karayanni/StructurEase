@@ -10,6 +10,55 @@ from Evaluation.EvaluateOutputFile import evaluate_classification_accuracy
 load_dotenv()
 
 
+async def extract_classification_number(response: str, system_prompt: str):
+    """
+    This function uses the LLM to extract the classification number from the given response.
+    It ensures that the extracted result is only the digit representing the classification.
+    """
+    client = AsyncOpenAI()
+
+    extraction_prompt = (
+        f"You are an expert at extracting structured information from free text. "
+        f"The following text is a response where the classification number was expected to be the last character but wasn't. "
+        f"Your task is to extract only the classification number (0, 1, or 2) from the context of the provided text. "
+        f"Here is the response: \"{response}\". "
+        f"Provide your answer as just the number without any explanation or additional text."
+    )
+
+    system_message = {
+        "role": "system",
+        "content": system_prompt
+    }
+
+    user_message = {
+        "role": "user",
+        "content": extraction_prompt
+    }
+
+    message_list = [system_message, user_message]
+
+    # Function to make the API call
+    async def make_completion_request():
+        curr_completion = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0,
+            top_p=1,
+            messages=message_list
+        )
+        return curr_completion
+
+    # Use exponential backoff to retry the API call
+    completion = await exponential_backoff_retry(make_completion_request)
+    extracted_number = completion.choices[0].message.content.strip()
+
+    # Ensure the result is a valid digit
+    if not extracted_number.isdigit():
+        logging.error(f"Failed to extract a valid number from the response: {extracted_number}")
+        return None
+
+    return extracted_number
+
+
 async def exponential_backoff_retry(func, max_retries=4, initial_delay=1, max_delay=16, jitter=0.5):
     retries = 0
     delay = initial_delay
@@ -34,7 +83,7 @@ async def classification_using_llm(clinical_note: str, system_prompt: str, user_
     message_list = []
 
     # todo: consider adding a wrapper to the provided prompt to ensure the LLM returns a valid response ending with a number.
-    ensure_end_in_number = f"\n\n MAKE SURE YOU END YOUR RESPONSE WITH THE NUMBER THAT CORRESPONDS THE THE CLASS. \n\n"
+    ensure_end_in_number = f"\n\n MAKE SURE YOU END YOUR RESPONSE WITH THE NUMBER THAT CORRESPONDS THE THE CLASS AND ONLY WITH THE NUMBER - MAKE SURE THE LAST CHARACTER OF YOUR RESPONSE IS THE NUMBER ONLY. \n\n"
 
     system_message = {
         "role": "system",
@@ -71,7 +120,7 @@ async def classification_using_llm(clinical_note: str, system_prompt: str, user_
 async def process_clinical_note(semaphore, row, system_prompt: str, user_prompt: str):
     # Placeholder for the actual processing logic
     # todo: remove when we need to call the LLM.
-    return "test test text", 2
+    # return "test test text", 2
 
     async with semaphore:
         clinical_note = row['Narrative_1']
@@ -85,7 +134,13 @@ async def process_clinical_note(semaphore, row, system_prompt: str, user_prompt:
             print(f"Error: Unexpected response format. Response: {response}")
             print(f"System Prompt: {system_prompt}")
             print(f"User Prompt: {user_prompt}")
-            return response, None  # Return None to indicate an invalid response
+
+            extracted_number = await extract_classification_number(response, system_prompt)
+            if extracted_number:
+                last_char = extracted_number
+            else:
+                logging.error(f"Failed to extract the classification number from the response: {response}")
+                return response, None
 
         return response, last_char
 
@@ -109,10 +164,6 @@ async def start_eval(system_prompt: str, user_prompt: str):
     last_label_index = 0
 
     for idx, row in df.iterrows():
-        # evaluate only the labeled rows - up to 2k labeled row...
-        if pd.isna(row['Helmet_Status']) or (idx >= 10):
-            last_label_index = idx
-            break
         tasks.append(process_clinical_note(semaphore, row, system_prompt, user_prompt))
 
     df_processed = df.iloc[:last_label_index].copy()
@@ -156,6 +207,14 @@ if __name__ == "__main__":
         f"Double check if there is a '-' minus or + plus sign before the helmet, it should be considered as no helmet or helmet respectively. \n\n"
         f"If you don't know the answer for sure or there are no relevant mentions or text, then you must say that you cannot determine the answer. Cannot determine, 2 \n\n"
         f"MAKE SURE TO END YOUR RESPONSE WITH THE NUMBER ONLY"
+    )
+
+    system_prompt_message = (
+        "You are an expert in medical note analysis specializing in determining whether a patient was wearing a helmet during an accident. Your task is to analyze the data provided and determine if the patient was wearing a helmet, not wearing a helmet, or if it cannot be determined. Consider all relevant information in the data and only in the provided data. For example, if the note explicitly states that the patient was wearing a helmet, classify it as CLASS 0 (Helmet). If the note indicates that the patient was not wearing a helmet, classify it as CLASS 1 (No Helmet). If the note does not provide clear information about the helmet status, classify it as CLASS 2 (cannot determine). Provide your answer as Helmet, No Helmet, cannot determine and appropriate number 0 if the answer is Helmet, 1 if the answer is No Helmet and 2 if the answer is cannot determine."
+    )
+
+    user_prompt_message = (
+        f"You are a medical note classifier. Please analyze the following free text data provided and determine if the patient was wearing a helmet, not wearing a helmet, or if it cannot be determined. Here are the notes: [Insert the unstructured notes here]."
     )
 
     asyncio.run(start_eval(system_prompt=system_prompt_message, user_prompt=user_prompt_message))
