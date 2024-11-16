@@ -98,7 +98,7 @@ async def start_eval(system_prompt: str, user_prompt: str):
     :return: Saves the processed data to a new CSV file.
     """
     # Read the CSV file
-    df = pd.read_csv('NEISS data/neiss_filtered_labeled.csv')
+    df = pd.read_csv('NEISS data/neiss_2023_filtered_labeled.csv')
 
     # Initialize a semaphore to limit concurrent API calls (adjust as needed)
     semaphore = asyncio.Semaphore(100)  # Limit to 100 concurrent tasks

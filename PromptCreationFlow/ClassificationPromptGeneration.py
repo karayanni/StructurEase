@@ -28,7 +28,7 @@ def exponential_backoff_retry(func, max_retries=4, initial_delay=0.5, max_delay=
             logging.error(f"Retrying after {delay} seconds... (Attempt {retries}/{max_retries})")
 
 
-def GenerateClassificationPrompt(df, column_name, classification_request, classes):
+def InitialGenerateClassificationPrompt(df, column_name, classification_request, classes):
     client = OpenAI()
 
     # Split the data into 80% validation and 20% test set
