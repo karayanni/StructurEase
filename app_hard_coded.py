@@ -4,6 +4,7 @@ import pandas as pd
 from PromptCreationFlow.ChooseLabelingData import ChooseLabelingData
 from PromptCreationFlow.ClassificationPromptGeneration import InitialGenerateClassificationPrompt
 from PromptCreationFlow.EvaluateCurrentPrompt import EvaluateCurrentPrompt
+from PromptCreationFlow.PromptImprovementStep import ImprovePrompt
 
 
 def main():
@@ -88,7 +89,7 @@ def main():
                         st.write(misclassified)
 
                         # STEP 4 - Update the Prompt with the Labeled Data as Few-Shot Learning
-                        # todo: add here the prompt update function call...
+                        st.session_state.current_prompt = ImprovePrompt(st.session_state.current_prompt, st.session_state.all_labeled_data, misclassified, classification_request, classes)
 
                         st.session_state.current_iteration += 1
 
@@ -137,7 +138,10 @@ def main():
                             st.write("Misclassified notes: ")
                             st.write(misclassified)
                             # STEP 4 - Update the Prompt with the Labeled Data as Few-Shot Learning
-                            # todo: add here the prompt update function call...
+                            st.session_state.current_prompt = ImprovePrompt(st.session_state.current_prompt,
+                                                                            st.session_state.all_labeled_data,
+                                                                            misclassified, classification_request,
+                                                                            classes)
 
                             st.session_state.current_iteration += 1
                 # Hardcoded up to 2 iterations of manual labeling.
@@ -186,7 +190,10 @@ def main():
                             st.write("Misclassified notes: ")
                             st.write(misclassified)
                             # STEP 4 - Update the Prompt with the Labeled Data as Few-Shot Learning
-                            # todo: add here the prompt update function call...
+                            st.session_state.current_prompt = ImprovePrompt(st.session_state.current_prompt,
+                                                                            st.session_state.all_labeled_data,
+                                                                            misclassified, classification_request,
+                                                                            classes)
 
                             st.session_state.current_iteration += 1
 

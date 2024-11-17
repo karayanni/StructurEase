@@ -210,6 +210,7 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
 
     results_curr_prompt = []
 
+    # todo: make this ASYNC for better performance... now takes forever
     for i, row in sampled_data.items():
         print(f"Index: {i}, Text: {row}")
         assistant_response_content, last_char, completion = process_clinical_note_sync(row, current_prompt['system_message'], current_prompt['user_message'])
@@ -252,7 +253,6 @@ def ChooseLabelingDataRandom(df: pd.DataFrame, column_name: str, current_prompt:
     # Filter out rows with indices in already_chosen_data_indices
     filtered_df = df.drop(index=already_chosen_data_indices, errors='ignore')
 
-    # todo: instead of sampling 10 rows randomly, run a first pass of the model to get the most 'uncertain'ish rows
     sampled_data = filtered_df[column_name].sample(10, random_state=42)
 
     # Extract indices and data as separate outputs
