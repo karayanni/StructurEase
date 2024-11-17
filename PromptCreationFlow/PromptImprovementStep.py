@@ -7,9 +7,28 @@ def ImprovePrompt(current_prompt: dict, all_labeled_data: pd.DataFrame, misclass
     This function is responsible for improving the prompt by iterating over the labeled data and improving the prompt
     It uses the miss-classified notes as few shots to improve the classification prompt.
     """
-    print(f"current_prompt: {current_prompt} - all_labeled_data: {all_labeled_data} - misclassified: {misclassified} - classification_request: {classification_request} - classes: {classes}")
-    # For now, we will just return the current prompt
-    return current_prompt
+    # print(f"current_prompt: {current_prompt} - all_labeled_data: {all_labeled_data} - misclassified: {misclassified} - classification_request: {classification_request} - classes: {classes}")
+
+    # Collect a few-shot example from misclassified data (if any)
+    few_shot_examples = []
+    for index, row in misclassified.iterrows():
+        few_shot_examples.append(f"Sample Text: {row['Sampled Text']} -> Expected Label: {row['Label']}")
+
+    # Add a few-shot example section to the prompt
+    few_shot_str = "\n".join(few_shot_examples)
+    improved_prompt = current_prompt.copy()
+
+    # Modify the system message to include the few-shot examples
+    improved_prompt['system_message'] = (
+        f"{current_prompt['system_message']}\n\n"
+        f"Here are a few examples of misclassified data that may help improve classification accuracy:\n"
+        f"{few_shot_str}\n\n"
+        f"Reflect on the misclassifications and use these examples to help determine the classification for new cases."
+    )
+    
+    print(f"Improved prompt:\n{improved_prompt['system_message']}")
+    
+    return improved_prompt
 
 
 if __name__ == '__main__':
