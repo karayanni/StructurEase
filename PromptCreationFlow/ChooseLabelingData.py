@@ -4,8 +4,9 @@ import pandas as pd
 import logging
 import time
 import random
-from openai import OpenAI
+from openai import AsyncOpenAI
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
@@ -15,7 +16,7 @@ async def extract_classification_number(response: str, system_prompt: str):
     This function uses the LLM to extract the classification number from the given response.
     It ensures that the extracted result is only the digit representing the classification.
     """
-    client = OpenAI()
+    client = AsyncOpenAI()
 
     extraction_prompt = (
         f"You are an expert at extracting structured information from free text. "
@@ -38,8 +39,8 @@ async def extract_classification_number(response: str, system_prompt: str):
     message_list = [system_message, user_message]
 
     # Function to make the API call
-    def make_completion_request():
-        curr_completion = client.chat.completions.create(
+    async def make_completion_request():
+        curr_completion = await client.chat.completions.create(
             model="gpt-4o-mini",
             temperature=0,
             top_p=1,
@@ -55,7 +56,7 @@ async def extract_classification_number(response: str, system_prompt: str):
     # Ensure the result is a valid digit
     if not extracted_number.isdigit():
         logging.error(f"Failed to extract a valid number from the response: {extracted_number}")
-        extracted_number = extract_classification_number(response, system_prompt)
+        return 0
 
     return extracted_number
 
@@ -113,13 +114,13 @@ def evaluate_manual_to_llm_df(llm_df: pd.DataFrame, classes: list):
     return report, misclassified[['Sampled Text', 'Label', 'LLM_number']]
 
 
-def exponential_backoff_retry(func, max_retries=4, initial_delay=1, max_delay=16, jitter=0.5):
+async def exponential_backoff_retry(func, max_retries=4, initial_delay=1, max_delay=16, jitter=0.5):
     retries = 0
     delay = initial_delay
 
     while retries < max_retries:
         try:
-            return func()
+            return await func()
         except Exception as e:
             retries += 1
             if retries >= max_retries:
@@ -131,9 +132,9 @@ def exponential_backoff_retry(func, max_retries=4, initial_delay=1, max_delay=16
             logging.error(f"Retrying after {delay} seconds... (Attempt {retries}/{max_retries})")
 
 
-def classification_using_llm(clinical_note: str, system_prompt: str, user_prompt: str):
+async def classification_using_llm(clinical_note: str, system_prompt: str, user_prompt: str):
     # Initialize the OpenAI client
-    client = OpenAI()
+    client = AsyncOpenAI()
     message_list = []
 
     # todo: consider adding a wrapper to the provided prompt to ensure the LLM returns a valid response ending with a number.
@@ -155,8 +156,8 @@ def classification_using_llm(clinical_note: str, system_prompt: str, user_prompt
     message_list.append(user_message)
 
     # Function to make the API call
-    def make_completion_request():
-        curr_completion = client.chat.completions.create(
+    async def make_completion_request():
+        curr_completion = await client.chat.completions.create(
             model="gpt-4o-mini",
             temperature=0,
             top_p=1,
@@ -166,30 +167,30 @@ def classification_using_llm(clinical_note: str, system_prompt: str, user_prompt
         return curr_completion
 
     # Use exponential backoff to retry the API call in case of rate limits or transient errors
-    completion = exponential_backoff_retry(make_completion_request)
+    completion = await exponential_backoff_retry(make_completion_request)
     assistant_response_content = completion.choices[0].message.content.strip()
 
     return assistant_response_content, completion
 
 
-def process_clinical_note_sync(clinical_note, system_prompt: str, user_prompt: str):
+async def process_clinical_note_sync(clinical_note, system_prompt: str, user_prompt: str, semaphore: asyncio.Semaphore):
     # Placeholder for the actual processing logic
     # todo: remove when we need to call the LLM.
     # return "test test text", 2
+    async with semaphore:
+        assistant_response_content, completion = await classification_using_llm(clinical_note, system_prompt, user_prompt)
+        # Extract the last character, which should be 0, 1, or 2
+        last_char = assistant_response_content.strip()[-1]
 
-    assistant_response_content, completion = classification_using_llm(clinical_note, system_prompt, user_prompt)
-    # Extract the last character, which should be 0, 1, or 2
-    last_char = assistant_response_content.strip()[-1]
+        if not last_char.isdigit():
+            logging.error(
+                f"Unexpected response format. Response: {assistant_response_content}, System Prompt: {system_prompt}, User Prompt: {user_prompt}")
+            print(f"Error: Unexpected response format. Response: {assistant_response_content}")
+            print(f"System Prompt: {system_prompt}")
+            print(f"User Prompt: {user_prompt}")
+            return assistant_response_content, None  # Return None to indicate an invalid response
 
-    if not last_char.isdigit():
-        logging.error(
-            f"Unexpected response format. Response: {assistant_response_content}, System Prompt: {system_prompt}, User Prompt: {user_prompt}")
-        print(f"Error: Unexpected response format. Response: {assistant_response_content}")
-        print(f"System Prompt: {system_prompt}")
-        print(f"User Prompt: {user_prompt}")
-        return assistant_response_content, None  # Return None to indicate an invalid response
-
-    return assistant_response_content, last_char, completion
+        return assistant_response_content, last_char, completion
 
 
 def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict, already_chosen_data_indices: list[int]):
@@ -208,18 +209,27 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
 
     sampled_data = filtered_df[column_name].sample(100, random_state=42)
 
-    results_curr_prompt = []
+    semaphore = asyncio.Semaphore(100)
 
-    # todo: make this ASYNC for better performance... now takes forever
+    tasks = []
+
     for i, row in sampled_data.items():
         print(f"Index: {i}, Text: {row}")
-        assistant_response_content, last_char, completion = process_clinical_note_sync(row, current_prompt['system_message'], current_prompt['user_message'])
+        tasks.append(process_clinical_note_sync(row, current_prompt['system_message'], current_prompt['user_message'], semaphore))
+
+    async def process_all_rows():
+        return await asyncio.gather(*tasks)
+
+    results_curr_prompt = asyncio.run(process_all_rows())
+    final_results = []
+    for simple_index, (i, row) in enumerate(sampled_data.items()):
+        assistant_response_content, last_char, completion = results_curr_prompt[simple_index]
         logprobs = [token.logprob for token in completion.choices[0].logprobs.content]
         confidence = math.exp(sum(logprobs) / len(logprobs))
-        results_curr_prompt.append((i, row, assistant_response_content, last_char, completion, confidence))
+        final_results.append((i, row, assistant_response_content, last_char, completion, confidence))
 
     # Sort the results by confidence (lower confidence first)
-    results_curr_prompt.sort(key=lambda x: x[-1])
+    final_results.sort(key=lambda x: x[-1])
 
     # choose 10 items from each class according to last_char
     sampled_indices = []
@@ -228,7 +238,7 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
     samples_per_class = {'0': [], '1': [], '2': []}
 
     # choosing up to 10 samples from each class with the lowest confidence.
-    for i, row, assistant_response_content, last_char, completion, confidence in results_curr_prompt:
+    for i, row, assistant_response_content, last_char, completion, confidence in final_results:
         if len(samples_per_class[last_char]) >= 10:
             continue
         else:
