@@ -188,7 +188,7 @@ async def process_clinical_note_sync(clinical_note, system_prompt: str, user_pro
             print(f"Error: Unexpected response format. Response: {assistant_response_content}")
             print(f"System Prompt: {system_prompt}")
             print(f"User Prompt: {user_prompt}")
-            return assistant_response_content, None  # Return None to indicate an invalid response
+            return assistant_response_content, extract_classification_number, None  # Return None to indicate an invalid response
 
         return assistant_response_content, last_char, completion
 
@@ -224,8 +224,11 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
     final_results = []
     for simple_index, (i, row) in enumerate(sampled_data.items()):
         assistant_response_content, last_char, completion = results_curr_prompt[simple_index]
-        logprobs = [token.logprob for token in completion.choices[0].logprobs.content]
-        confidence = math.exp(sum(logprobs) / len(logprobs))
+        # FOR ROBUSTNESS...
+        confidence = 1.0
+        if completion:
+            logprobs = [token.logprob for token in completion.choices[0].logprobs.content]
+            confidence = math.exp(sum(logprobs) / len(logprobs))
         final_results.append((i, row, assistant_response_content, last_char, completion, confidence))
 
     # Sort the results by confidence (lower confidence first)

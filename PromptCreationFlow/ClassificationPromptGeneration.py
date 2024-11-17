@@ -4,7 +4,6 @@ import time
 import logging
 from openai import OpenAI
 from dotenv import load_dotenv
-from sklearn.model_selection import train_test_split
 
 
 load_dotenv()
@@ -30,23 +29,21 @@ def exponential_backoff_retry(func, max_retries=4, initial_delay=0.5, max_delay=
 def InitialGenerateClassificationPrompt(df, column_name, classification_request, classes):
     client = OpenAI()
 
-    # Split the data into 80% validation and 20% test set
-    train_df, _ = train_test_split(df, test_size=0.2, random_state=42)
-    sample_notes = train_df[column_name].sample(10, random_state=42).tolist()
+    sample_notes = df[column_name].sample(10, random_state=42).tolist()
 
     # TODO: Improve the prompt by adding think step by step and adding the explanation before the answer.
     user_message_content = (
-        "Generate a JSON object with two keys: 'system_message' and 'user_message'.\n"
+        "Generate a JSON object with two keys: 'system_message' and 'user_message'. RESPONSE WITH THE STRING THAT REPRESENT THE JSON.\n"
         "The 'system_message' should instruct the assistant on how to classify unstructured notes based on the following criteria:\n\n"
         f"Classification Request: {classification_request}\n\n"
         f"Classification Classes: {', '.join([f'CLASS {i} NAME: {cls}' for i, cls in enumerate(classes)])}\n\n"
-        "Provided below are 10 sample unstructured notes to use in the prompt generation for enriching the prompt and providing examples inside the prompt: \n\n"
+        "Provided below are 10 sample inputs that reflect what the prompt should expect. you can use these examples to better craft the prompt.\n\n"
         )
     for idx, note in enumerate(sample_notes, start=1):
         user_message_content += f"\nExample {idx}: \"{note}\" \n"
 
     user_message_content_continuation = (
-        "Use the style of the following example for structure, tone, and clarity.\n\n"
+        "\n Use the style of the following example for structure, tone, and clarity. MAKE SURE YOUR OUTPUT IS A STRING THAT REFLECTS THE DICTIONARY STARTING WITH \" AND ENDING WITH \" - MAKE SURE YOUR OUTPUT IS A VALID JSON STRING. \n\n"
         "Here is an example to follow - MAKE SURE TO USE THE SAME STRUCTURE:\n\n"
         "{"
         "\"system_message\":\n"
@@ -55,8 +52,7 @@ def InitialGenerateClassificationPrompt(df, column_name, classification_request,
         "Consider all relevant information in the data and only in the provided data. [ADD ANY SPECIFIC EXAMPLE DETAILS AND INFO THAT CAN BE RELEVANT FROM THE EXAMPLES YOU SEE] "
         "Provide your answer as [Explanation here] [CLASS 0 NAME HERE], [CLASS 1 NAME HERE], ...[CLASS K NAME HERE] and appropriate number 0 if the answer is [CLASS 0], 1 if the answer is [CLASS 1 NAME HERE] and so on.\"\n\n"
         "\"user_message\":\n"
-        "\"You are a [COMPLETE ACCORDING TO CONTEXT HERE]. Please analyze the following free text data provided and determine [COMPLETE ACCORDING TO CLASSIFICATION CONTEXT HERE]\"\n\n"
-        "MAKE SURE TO END YOUR RESPONSE WITH THE NUMBER ONLY. \n\n"
+        "\"You are a [COMPLETE ACCORDING TO CONTEXT HERE]. Your task is to read an unstructured text and classify it according to the given classes. Please analyze the following free text data provided and determine [COMPLETE ACCORDING TO CLASSIFICATION CONTEXT HERE]. MAKE SURE TO END YOUR RESPONSE WITH THE NUMBER ONLY.\"\n\n"
         "}"
     )
 
@@ -95,4 +91,6 @@ def InitialGenerateClassificationPrompt(df, column_name, classification_request,
 
     response_dict = json.loads(assistant_response)
 
+    response_dict["system_message"] = response_dict["system_message"] + "\n\n AGAIN MAKE SURE YOUR ANSWER ENDS WITH A DIGIT ONLY FOR EXAMPLE 1"
+    response_dict["user_message"] = response_dict["user_message"] + "\n\n AGAIN MAKE SURE YOUR ANSWER ENDS WITH A DIGIT ONLY FOR EXAMPLE 1"
     return response_dict
