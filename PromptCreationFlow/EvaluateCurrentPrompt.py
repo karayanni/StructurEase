@@ -85,6 +85,20 @@ def evaluate_manual_to_llm_df(llm_df: pd.DataFrame, classes: list):
     # Compare Helmet_Status_Num with LLM_number
     df['Correct'] = df['Helmet_Status_Num'] == df['LLM_number']
 
+    correct_prediction_class = 0
+    total_class_observations = 0
+    total_class_predictions = 0
+
+    for class_label in df['LLM_number'].unique():
+        correct_prediction_class += \
+        (df.loc[(df['LLM_number'] == class_label) & (df['Helmet_Status_Num'] == df['LLM_number'])]).shape[0]  # tp
+        total_class_observations += (df['Helmet_Status_Num'] == class_label).sum()  # tp + fn
+        total_class_predictions += (df['LLM_number'] == class_label).sum()  # tp + fp
+
+    precision = correct_prediction_class / total_class_predictions
+    recall = correct_prediction_class / total_class_observations
+    macro_f1_score = 2 * ((precision * recall) / (precision + recall))
+
     # Calculate accuracy
     total_cases = len(df)
     correct_cases = df['Correct'].sum()
@@ -98,7 +112,10 @@ def evaluate_manual_to_llm_df(llm_df: pd.DataFrame, classes: list):
         "accuracy_rate": accuracy_rate,
         "total_cases": total_cases,
         "correct_cases": correct_cases,
-        "incorrect_cases": total_cases - correct_cases
+        "incorrect_cases": total_cases - correct_cases,
+        "precision": precision,
+        "recall": recall,
+        "macro_f1_score": macro_f1_score
     }
 
     # Display results
