@@ -203,6 +203,14 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
     # Sample data from the filtered DataFrame
     sampled_data = filtered_df[column_name].sample(100, random_state=42)
 
+    # Create or retrieve an event loop
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    # Explicitly tie the semaphore to the event loop
     semaphore = asyncio.Semaphore(100)
 
     tasks = []
@@ -213,13 +221,6 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
 
     async def process_all_rows():
         return await asyncio.gather(*tasks)
-
-    # Check or create an event loop
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
 
     # Run the asynchronous tasks
     results_curr_prompt = loop.run_until_complete(process_all_rows())
