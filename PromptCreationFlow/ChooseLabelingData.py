@@ -195,18 +195,12 @@ async def process_clinical_note_sync(clinical_note, system_prompt: str, user_pro
 
 def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict, already_chosen_data_indices: list[int]):
     """
-    This function is used to choose the next K data rows that will be used for manual labeling.
-    The function will return a list of indices of the chosen data rows. It uses the current prompt to assess diverse
-    and challenging rows for manual labeling to maximize the model's learning form the human input.
-    :param df: DataFrame, the input data
-    :param column_name: str, the column name of the data to be labeled
-    :param current_prompt: str, the latest prompt used to classify the data
-    :param already_chosen_data_indices: list, indices of the data rows that have already been chosen for manual labeling
-    :return: list, indices of the chosen data rows
+    This function chooses the next K data rows for manual labeling.
     """
     # Filter out rows with indices in already_chosen_data_indices
     filtered_df = df.drop(index=already_chosen_data_indices, errors='ignore')
 
+    # Sample data from the filtered DataFrame
     sampled_data = filtered_df[column_name].sample(100, random_state=42)
 
     semaphore = asyncio.Semaphore(100)
@@ -220,34 +214,42 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
     async def process_all_rows():
         return await asyncio.gather(*tasks)
 
-    results_curr_prompt = asyncio.run(process_all_rows())
+    # Check or create an event loop
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    # Run the asynchronous tasks
+    results_curr_prompt = loop.run_until_complete(process_all_rows())
+
+    # Process the results
     final_results = []
     for simple_index, (i, row) in enumerate(sampled_data.items()):
         assistant_response_content, last_char, completion = results_curr_prompt[simple_index]
-        # FOR ROBUSTNESS...
+
+        # Calculate confidence
         confidence = 1.0
         if completion:
             logprobs = [token.logprob for token in completion.choices[0].logprobs.content]
             confidence = math.exp(sum(logprobs) / len(logprobs))
         final_results.append((i, row, assistant_response_content, last_char, completion, confidence))
 
-    # Sort the results by confidence (lower confidence first)
+    # Sort results by confidence
     final_results.sort(key=lambda x: x[-1])
 
-    # choose 10 items from each class according to last_char
+    # Choose up to 10 samples per class
     sampled_indices = []
     sampled_values = []
-
     samples_per_class = {'0': [], '1': [], '2': []}
 
-    # choosing up to 10 samples from each class with the lowest confidence.
     for i, row, assistant_response_content, last_char, completion, confidence in final_results:
         if len(samples_per_class[last_char]) >= 10:
             continue
-        else:
-            samples_per_class[last_char].append(i)
-            sampled_indices.append(i)
-            sampled_values.append(row)
+        samples_per_class[last_char].append(i)
+        sampled_indices.append(i)
+        sampled_values.append(row)
 
     return sampled_indices, sampled_values
 
