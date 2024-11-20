@@ -1,12 +1,10 @@
-import math
-
+import asyncio
 import pandas as pd
 import logging
 import time
 import random
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
-import asyncio
 
 load_dotenv()
 
@@ -89,6 +87,20 @@ def evaluate_manual_to_llm_df(llm_df: pd.DataFrame, classes: list):
     # Compare Helmet_Status_Num with LLM_number
     df['Correct'] = df['Helmet_Status_Num'] == df['LLM_number']
 
+    correct_prediction_class = 0
+    total_class_observations = 0
+    total_class_predictions = 0
+
+    for class_label in df['LLM_number'].unique():
+        correct_prediction_class += \
+            (df.loc[(df['LLM_number'] == class_label) & (df['Helmet_Status_Num'] == df['LLM_number'])]).shape[0]  # tp
+        total_class_observations += (df['Helmet_Status_Num'] == class_label).sum()  # tp + fn
+        total_class_predictions += (df['LLM_number'] == class_label).sum()  # tp + fp
+
+    precision = correct_prediction_class / total_class_predictions
+    recall = correct_prediction_class / total_class_observations
+    macro_f1_score = 2 * ((precision * recall) / (precision + recall))
+
     # Calculate accuracy
     total_cases = len(df)
     correct_cases = df['Correct'].sum()
@@ -102,7 +114,10 @@ def evaluate_manual_to_llm_df(llm_df: pd.DataFrame, classes: list):
         "accuracy_rate": accuracy_rate,
         "total_cases": total_cases,
         "correct_cases": correct_cases,
-        "incorrect_cases": total_cases - correct_cases
+        "incorrect_cases": total_cases - correct_cases,
+        "precision": precision,
+        "recall": recall,
+        "macro_f1_score": macro_f1_score
     }
 
     # Display results
@@ -174,11 +189,9 @@ async def classification_using_llm(clinical_note: str, system_prompt: str, user_
 
 
 async def process_clinical_note_sync(clinical_note, system_prompt: str, user_prompt: str, semaphore: asyncio.Semaphore):
-    # Placeholder for the actual processing logic
-    # todo: remove when we need to call the LLM.
-    # return "test test text", 2
     async with semaphore:
-        assistant_response_content, completion = await classification_using_llm(clinical_note, system_prompt, user_prompt)
+        assistant_response_content, completion = await classification_using_llm(clinical_note, system_prompt,
+                                                                                user_prompt)
         # Extract the last character, which should be 0, 1, or 2
         last_char = assistant_response_content.strip()[-1]
 
@@ -193,15 +206,17 @@ async def process_clinical_note_sync(clinical_note, system_prompt: str, user_pro
         return assistant_response_content, last_char, completion
 
 
-def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict, already_chosen_data_indices: list[int]):
+def evaluate_classification_accuracy_on_entire_DS(system_prompt: str, user_prompt: str, output_file: str):
     """
-    This function chooses the next K data rows for manual labeling.
+    Evaluate the classification accuracy of LLM's output in the given prompts.
     """
-    # Filter out rows with indices in already_chosen_data_indices
-    filtered_df = df.drop(index=already_chosen_data_indices, errors='ignore')
+    labeled_data_file = 'Evaluation/NEISS data/neiss_2023_filtered_2000_rows_labeled_mapped.csv'
+    df = pd.read_csv(labeled_data_file)
 
-    # Sample data from the filtered DataFrame
-    sampled_data = filtered_df[column_name].sample(200, random_state=69)
+    # df = df.head(1)
+
+    responses = []
+    numbers = []
 
     # Create or retrieve an event loop
     try:
@@ -210,14 +225,12 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    # Explicitly tie the semaphore to the event loop
-    semaphore = asyncio.Semaphore(100)
+    semaphore = asyncio.Semaphore(200)
 
     tasks = []
 
-    for i, row in sampled_data.items():
-        print(f"Index: {i}, Text: {row}")
-        tasks.append(process_clinical_note_sync(row, current_prompt['system_message'], current_prompt['user_message'], semaphore))
+    for i, row in df.iterrows():
+        tasks.append(process_clinical_note_sync(row['Narrative_1'], system_prompt, user_prompt, semaphore))
 
     async def process_all_rows():
         return await asyncio.gather(*tasks)
@@ -225,54 +238,60 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
     # Run the asynchronous tasks
     results_curr_prompt = loop.run_until_complete(process_all_rows())
 
-    # Process the results
-    final_results = []
-    for simple_index, (i, row) in enumerate(sampled_data.items()):
-        assistant_response_content, last_char, completion = results_curr_prompt[simple_index]
+    for (assistant_response_content, last_char, completion) in results_curr_prompt:
+        responses.append(assistant_response_content)
+        numbers.append(last_char)
 
-        # Calculate confidence
-        confidence = 1.0
-        if completion:
-            logprobs = [token.logprob for token in completion.choices[0].logprobs.content]
-            confidence = math.exp(sum(logprobs) / len(logprobs))
-        final_results.append((i, row, assistant_response_content, last_char, completion, confidence))
+    # Add the new columns to the DataFrame
+    df['LLM_output'] = responses
+    df['LLM_number'] = numbers
 
-    # Sort results by confidence
-    final_results.sort(key=lambda x: x[-1])
+    df = df.dropna(subset=['Helmet_Status_Num'])
 
-    # Choose up to 10 samples per class
-    sampled_indices = []
-    sampled_values = []
-    samples_per_class = {'0': [], '1': [], '2': []}
+    # Convert columns to integers for accurate comparison
+    df['Helmet_Status_Num'] = df['Helmet_Status_Num'].astype(int)
+    df['LLM_number'] = df['LLM_number'].astype(int)
 
-    for i, row, assistant_response_content, last_char, completion, confidence in final_results:
-        if len(samples_per_class[last_char]) >= 10:
-            continue
-        samples_per_class[last_char].append(i)
-        sampled_indices.append(i)
-        sampled_values.append(row)
+    # Compare Helmet_Status_Num with LLM_number
+    df['Correct'] = df['Helmet_Status_Num'] == df['LLM_number']
 
-    return sampled_indices, sampled_values
+    # save the output to a file
+    df.to_csv(f"Evaluation/experiment_results/{output_file}.csv", index=False)
+
+    # Calculate accuracy
+    total_cases = len(df)
+    correct_cases = df['Correct'].sum()
+    accuracy_rate = correct_cases / total_cases * 100
+
+    # Extract misclassified rows for reporting
+    misclassified = df[~df['Correct']].copy()
+
+    # TODO: Add F1, RECALL AND ALL THAT SHIT...
+    report = {
+        "accuracy_rate": accuracy_rate,
+        "total_cases": total_cases,
+        "correct_cases": correct_cases,
+        "incorrect_cases": total_cases - correct_cases,
+        "misclassified_cases": misclassified[['CPSC_Case_Number', 'Helmet_Status', 'LLM_number', 'Narrative_1']]
+    }
+
+    # Display results
+    print(f"Accuracy Rate: {accuracy_rate:.2f}%")
+    print(f"Total Cases: {total_cases}")
+    print(f"Correctly Classified Cases: {correct_cases}")
+    print(f"Incorrectly Classified Cases: {total_cases - correct_cases}")
+
+    if not misclassified.empty:
+        print("\nMisclassified Cases:")
+        print(misclassified[['CPSC_Case_Number', 'Helmet_Status', 'LLM_number', 'Narrative_1']])
+    else:
+        print("\nNo misclassified cases found.")
+
+    return report
 
 
-def ChooseLabelingDataRandom(df: pd.DataFrame, column_name: str, current_prompt: dict, already_chosen_data_indices: list[int]):
-    """
-    This function is used to choose the next K data rows that will be used for manual labeling.
-    The function will return a list of indices of the chosen data rows. It uses the current prompt to assess diverse
-    and challenging rows for manual labeling to maximize the model's learning form the human input.
-    :param df: DataFrame, the input data
-    :param column_name: str, the column name of the data to be labeled
-    :param current_prompt: str, the latest prompt used to classify the data
-    :param already_chosen_data_indices: list, indices of the data rows that have already been chosen for manual labeling
-    :return: list, indices of the chosen data rows
-    """
-    # Filter out rows with indices in already_chosen_data_indices
-    filtered_df = df.drop(index=already_chosen_data_indices, errors='ignore')
-
-    sampled_data = filtered_df[column_name].sample(10, random_state=42)
-
-    # Extract indices and data as separate outputs
-    sampled_indices = sampled_data.index.tolist()
-    sampled_values = sampled_data.values.tolist()
-
-    return sampled_indices, sampled_values
+if __name__ == '__main__':
+    classification_report = evaluate_classification_accuracy_on_entire_DS(
+        system_prompt="You are an expert in analyzing patient injury reports specializing in determining whether a patient was wearing a helmet during an accident. Your task is to analyze the data provided and determine if the patient was wearing a helmet, not wearing a helmet, or if it cannot be determined. Consider all relevant information in the data and only in the provided data. For example, if the text explicitly states that the patient was wearing a helmet, classify it as 'Helmet'. If it states that the patient was not wearing a helmet, classify it as 'No Helmet'. If the information is ambiguous or missing, classify it as 'cannot determine'. Provide your answer as Helmet, No Helmet, cannot determine and appropriate number 0 if the answer is Helmet, 1 if the answer is No Helmet and 2 if the answer is cannot determine.\n\n AGAIN MAKE SURE YOUR ANSWER ENDS WITH A DIGIT ONLY FOR EXAMPLE 1",
+        user_prompt="You are a medical data analyst. Your task is to read an unstructured text and classify it according to the given classes. Please analyze the following free text data provided and determine if the patient was wearing a helmet, not wearing a helmet, or if it cannot be determined. MAKE SURE TO END YOUR RESPONSE WITH THE NUMBER ONLY.\n\n AGAIN MAKE SURE YOUR ANSWER ENDS WITH A DIGIT ONLY FOR EXAMPLE 1",
+        output_file="stam-test")

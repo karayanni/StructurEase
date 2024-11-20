@@ -35,6 +35,7 @@ def InitialGenerateClassificationPrompt(df, column_name, classification_request,
     user_message_content = (
         "Generate a JSON object with two keys: 'system_message' and 'user_message'. RESPONSE WITH THE STRING THAT REPRESENT THE JSON.\n"
         "The 'system_message' should instruct the assistant on how to classify unstructured notes based on the following criteria:\n\n"
+        # f"In the generated prompt, ask in the 'user_message' to think step by step and provide a 1 sentence reasoning before providing the final answer. \n\n"
         f"Classification Request: {classification_request}\n\n"
         f"Classification Classes: {', '.join([f'CLASS {i} NAME: {cls}' for i, cls in enumerate(classes)])}\n\n"
         "Provided below are 10 sample inputs that reflect what the prompt should expect. you can use these examples to better craft the prompt.\n\n"
@@ -53,6 +54,7 @@ def InitialGenerateClassificationPrompt(df, column_name, classification_request,
         "Provide your answer as [Explanation here] [CLASS 0 NAME HERE], [CLASS 1 NAME HERE], ...[CLASS K NAME HERE] and appropriate number 0 if the answer is [CLASS 0], 1 if the answer is [CLASS 1 NAME HERE] and so on.\"\n\n"
         "\"user_message\":\n"
         "\"You are a [COMPLETE ACCORDING TO CONTEXT HERE]. Your task is to read an unstructured text and classify it according to the given classes. Please analyze the following free text data provided and determine [COMPLETE ACCORDING TO CLASSIFICATION CONTEXT HERE]. MAKE SURE TO END YOUR RESPONSE WITH THE NUMBER ONLY.\"\n\n"
+        # "\"You are a [COMPLETE ACCORDING TO CONTEXT HERE]. Your task is to read an unstructured text and classify it according to the given classes. Think step by step and analyze the following free text data provided and determine [COMPLETE ACCORDING TO CLASSIFICATION CONTEXT HERE]. Provide your answer as [EXPLANATION AND REASONING], [CLASSIFICATION] [CLASSIFICATION NUMBER]  MAKE SURE TO END YOUR RESPONSE WITH THE NUMBER ONLY.\"\n\n"
         "}"
     )
 
@@ -93,4 +95,8 @@ def InitialGenerateClassificationPrompt(df, column_name, classification_request,
 
     response_dict["system_message"] = response_dict["system_message"] + "\n\n AGAIN MAKE SURE YOUR ANSWER ENDS WITH A DIGIT ONLY FOR EXAMPLE 1"
     response_dict["user_message"] = response_dict["user_message"] + "\n\n AGAIN MAKE SURE YOUR ANSWER ENDS WITH A DIGIT ONLY FOR EXAMPLE 1"
+
+    # response_dict["user_message"] = response_dict["user_message"] + "\n\n AGAIN MAKE SURE YOUR RESPONSE IS IN THIS FORM [1 SENTENCE REASONING],[CLASSIFICATION CLASS],[CLASSIFICATION NUMBER] " \
+    #                                                                 "\n Example Answer: [...step by step reasoning here ...], class 1,1" \
+    #                                                                 "\n Example Answer: [...step by step reasoning here ...], class 3,3" \                                                                 "\n\n  AGAIN MAKE SURE YOUR ANSWER ENDS WITH A DIGIT ONLY FOR EXAMPLE 1"
     return response_dict

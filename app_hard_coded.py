@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 
+from Evaluation.EvaluateCurrentPromptOnEntireDS import evaluate_classification_accuracy_on_entire_DS
 from PromptCreationFlow.ChooseLabelingData import ChooseLabelingData
 from PromptCreationFlow.ClassificationPromptGeneration import InitialGenerateClassificationPrompt
 from PromptCreationFlow.EvaluateCurrentPrompt import EvaluateCurrentPrompt
@@ -52,6 +53,7 @@ def main():
                 with st.form(f"labeling_form_0"):
                     # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                     if "sample_0" not in st.session_state:
+                        evaluate_classification_accuracy_on_entire_DS(st.session_state.current_prompt["system_message"], st.session_state.current_prompt["user_message"], "P_0_classification_k_200")
                         sampled_indices, sampled_values = ChooseLabelingData(df, column_name, st.session_state.current_prompt,
                                                                          st.session_state.already_chosen_data_indices)
                         st.session_state.sample_0 = sampled_values
@@ -97,6 +99,9 @@ def main():
                     with st.form(f"labeling_form_1"):
                         # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                         if "sample_1" not in st.session_state:
+                            evaluate_classification_accuracy_on_entire_DS(
+                                st.session_state.current_prompt["system_message"],
+                                st.session_state.current_prompt["user_message"], "P_1_classification_k_200")
 
                             sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
                                                                              st.session_state.current_prompt,
@@ -150,6 +155,10 @@ def main():
                         # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                         if "sample_2" not in st.session_state:
 
+                            evaluate_classification_accuracy_on_entire_DS(
+                                st.session_state.current_prompt["system_message"],
+                                st.session_state.current_prompt["user_message"], "P_2_classification_k_200")
+
                             sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
                                                                              st.session_state.current_prompt,
                                                                              st.session_state.already_chosen_data_indices)
@@ -170,6 +179,62 @@ def main():
 
                         if submit_labels:
                             newly_labeled_data = pd.DataFrame({"Sampled Text": st.session_state.sample_2, "Label": labels})
+                            combined_labeled_data = pd.concat([st.session_state.all_labeled_data, newly_labeled_data],
+                                                              ignore_index=True)
+                            st.write("Labeled Data Preview:")
+                            st.write(combined_labeled_data)
+                            st.session_state.all_labeled_data = combined_labeled_data
+
+                            st.write(
+                                f"Evaluation of Prompt_{st.session_state.current_iteration} on the manually Labeled Data")
+
+                            # STEP 3 - Return Evaluation of the Labeled Data to User
+                            eval_report, misclassified = EvaluateCurrentPrompt(
+                                st.session_state.current_prompt["system_message"],
+                                st.session_state.current_prompt["user_message"],
+                                st.session_state.all_labeled_data,
+                                classes)
+
+                            st.write(eval_report)
+                            st.write("Misclassified notes: ")
+                            st.write(misclassified)
+                            # STEP 4 - Update the Prompt with the Labeled Data as Few-Shot Learning
+                            st.session_state.current_prompt = ImprovePrompt(st.session_state.current_prompt,
+                                                                            st.session_state.all_labeled_data,
+                                                                            misclassified, classification_request,
+                                                                            classes)
+
+                            st.session_state.current_iteration += 1
+
+                if st.session_state.current_iteration > 2:
+                    with st.form(f"labeling_form_3"):
+                        # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
+                        if "sample_3" not in st.session_state:
+
+                            evaluate_classification_accuracy_on_entire_DS(
+                                st.session_state.current_prompt["system_message"],
+                                st.session_state.current_prompt["user_message"], "P_3_classification_k_200")
+
+                            sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
+                                                                             st.session_state.current_prompt,
+                                                                             st.session_state.already_chosen_data_indices)
+                            st.session_state.sample_3 = sampled_values
+
+                            st.session_state.already_chosen_data_indices.extend(sampled_indices)
+
+                        st.write(f"Prompt_{st.session_state.current_iteration}: \n\n {st.session_state.current_prompt}")
+
+                        st.subheader(f"Manual Labeling Iteration: {st.session_state.current_iteration}")
+                        labels = []
+                        for i, row in enumerate(st.session_state.sample_3):
+                            label = st.selectbox(f"Row {i + 1}: {row}", options=classes,
+                                                 key=f"label_3_{i}")
+                            labels.append(label)
+
+                        submit_labels = st.form_submit_button("Submit")
+
+                        if submit_labels:
+                            newly_labeled_data = pd.DataFrame({"Sampled Text": st.session_state.sample_3, "Label": labels})
                             combined_labeled_data = pd.concat([st.session_state.all_labeled_data, newly_labeled_data],
                                                               ignore_index=True)
                             st.write("Labeled Data Preview:")
