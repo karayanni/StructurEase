@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-from Evaluation.EvaluateCurrentPromptOnEntireDS import evaluate_classification_accuracy_on_entire_DS
+from Evaluation.EvaluateCurrentPromptOnEntireDS import evaluate_classification_accuracy_on_entire_DS, run_classification_on_entire_DS
 from PromptCreationFlow.ChooseLabelingData import ChooseLabelingData
 from PromptCreationFlow.ClassificationPromptGeneration import InitialGenerateClassificationPrompt
 from PromptCreationFlow.EvaluateCurrentPrompt import EvaluateCurrentPrompt
@@ -267,7 +267,7 @@ def main():
                     # Call a function with these parameters
                     st.write(f"Final Classification Prompt: {st.session_state.current_prompt}")
 
-                    df_with_eval = evaluate_classification_accuracy_on_entire_DS(df, column_name,
+                    df_with_eval = run_classification_on_entire_DS(df, column_name,
                         st.session_state.current_prompt["system_message"],
                         st.session_state.current_prompt["user_message"], "final_results")
 
