@@ -201,7 +201,7 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
     filtered_df = df.drop(index=already_chosen_data_indices, errors='ignore')
 
     # Sample data from the filtered DataFrame
-    sampled_data = filtered_df[column_name].sample(200, random_state=69)
+    sampled_data = filtered_df[column_name].sample(200)
 
     # Create or retrieve an event loop
     try:
@@ -269,7 +269,7 @@ def ChooseLabelingDataRandom(df: pd.DataFrame, column_name: str, current_prompt:
     # Filter out rows with indices in already_chosen_data_indices
     filtered_df = df.drop(index=already_chosen_data_indices, errors='ignore')
 
-    sampled_data = filtered_df[column_name].sample(10, random_state=42)
+    sampled_data = filtered_df[column_name].sample(30)
 
     # Extract indices and data as separate outputs
     sampled_indices = sampled_data.index.tolist()

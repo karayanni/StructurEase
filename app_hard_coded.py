@@ -53,7 +53,7 @@ def main():
                 with st.form(f"labeling_form_0"):
                     # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                     if "sample_0" not in st.session_state:
-                        evaluate_classification_accuracy_on_entire_DS(st.session_state.current_prompt["system_message"], st.session_state.current_prompt["user_message"], "P_0_classification_k_200")
+                        # evaluate_classification_accuracy_on_entire_DS(st.session_state.current_prompt["system_message"], st.session_state.current_prompt["user_message"], "P_0_classification_k_200")
                         sampled_indices, sampled_values = ChooseLabelingData(df, column_name, st.session_state.current_prompt,
                                                                          st.session_state.already_chosen_data_indices)
                         st.session_state.sample_0 = sampled_values
@@ -99,9 +99,9 @@ def main():
                     with st.form(f"labeling_form_1"):
                         # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                         if "sample_1" not in st.session_state:
-                            evaluate_classification_accuracy_on_entire_DS(
-                                st.session_state.current_prompt["system_message"],
-                                st.session_state.current_prompt["user_message"], "P_1_classification_k_200")
+                            # evaluate_classification_accuracy_on_entire_DS(
+                            #     st.session_state.current_prompt["system_message"],
+                            #     st.session_state.current_prompt["user_message"], "P_1_classification_k200_sampling_10")
 
                             sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
                                                                              st.session_state.current_prompt,
@@ -155,9 +155,9 @@ def main():
                         # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                         if "sample_2" not in st.session_state:
 
-                            evaluate_classification_accuracy_on_entire_DS(
-                                st.session_state.current_prompt["system_message"],
-                                st.session_state.current_prompt["user_message"], "P_2_classification_k_200")
+                            # evaluate_classification_accuracy_on_entire_DS(
+                            #     st.session_state.current_prompt["system_message"],
+                            #     st.session_state.current_prompt["user_message"], "P_2_classification_k_200")
 
                             sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
                                                                              st.session_state.current_prompt,
@@ -211,9 +211,9 @@ def main():
                         # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                         if "sample_3" not in st.session_state:
 
-                            evaluate_classification_accuracy_on_entire_DS(
-                                st.session_state.current_prompt["system_message"],
-                                st.session_state.current_prompt["user_message"], "P_3_classification_k_200")
+                            # evaluate_classification_accuracy_on_entire_DS(
+                            #     st.session_state.current_prompt["system_message"],
+                            #     st.session_state.current_prompt["user_message"], "P_3_classification_k_200")
 
                             sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
                                                                              st.session_state.current_prompt,
@@ -267,8 +267,14 @@ def main():
                     # Call a function with these parameters
                     st.write(f"Final Classification Prompt: {st.session_state.current_prompt}")
 
-                    # todo: add final evaluation function call here...
-                    st.write("Final Classification Started")
+                    df_with_eval = evaluate_classification_accuracy_on_entire_DS(df, column_name,
+                        st.session_state.current_prompt["system_message"],
+                        st.session_state.current_prompt["user_message"], "final_results")
+
+                    # preview the df_with_eval and add a button to download the entire CSV file.
+                    st.write("Final Classification Results:")
+                    st.write(df_with_eval.head())
+                    st.button("Download Final Classification Results", df_with_eval.to_csv, "final_classification_results.csv")
 
         else:
             st.warning("Please enter at least two qualification classes.")

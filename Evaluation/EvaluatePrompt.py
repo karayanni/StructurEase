@@ -156,7 +156,7 @@ async def start_eval(system_prompt: str, user_prompt: str):
     df = pd.read_csv('NEISS data/neiss_2023_filtered_labeled.csv')
 
     # Initialize a semaphore to limit concurrent API calls (adjust as needed)
-    semaphore = asyncio.Semaphore(100)  # Limit to 100 concurrent tasks
+    semaphore = asyncio.Semaphore(200)  # Limit to 100 concurrent tasks
 
     # Create a list of tasks for asynchronous execution
     tasks = []

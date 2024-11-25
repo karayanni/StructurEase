@@ -210,7 +210,7 @@ def evaluate_classification_accuracy_on_entire_DS(system_prompt: str, user_promp
     """
     Evaluate the classification accuracy of LLM's output in the given prompts.
     """
-    labeled_data_file = 'Evaluation/NEISS data/neiss_2023_filtered_2000_rows_labeled_mapped.csv'
+    labeled_data_file = 'Evaluation/NEISS data/neiss_2023_filtered_2000_rows_labeled_mapped_fixed.csv'
     df = pd.read_csv(labeled_data_file)
 
     # df = df.head(1)
@@ -256,7 +256,7 @@ def evaluate_classification_accuracy_on_entire_DS(system_prompt: str, user_promp
     df['Correct'] = df['Helmet_Status_Num'] == df['LLM_number']
 
     # save the output to a file
-    df.to_csv(f"Evaluation/experiment_results/{output_file}.csv", index=False)
+    df.to_csv(f"Evaluation/experiment_results/k200SamplingP1/{output_file}.csv", index=False)
 
     # Calculate accuracy
     total_cases = len(df)
@@ -288,6 +288,45 @@ def evaluate_classification_accuracy_on_entire_DS(system_prompt: str, user_promp
         print("\nNo misclassified cases found.")
 
     return report
+
+
+def run_classification_on_entire_DS(df: pd.DataFrame, column_name: str, system_prompt: str, user_prompt: str, output_file: str):
+    """
+    Evaluate the classification accuracy of LLM's output in the given prompts.
+    """
+
+    responses = []
+    numbers = []
+
+    # Create or retrieve an event loop
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    semaphore = asyncio.Semaphore(200)
+
+    tasks = []
+
+    for i, row in df.iterrows():
+        tasks.append(process_clinical_note_sync(row[column_name], system_prompt, user_prompt, semaphore))
+
+    async def process_all_rows():
+        return await asyncio.gather(*tasks)
+
+    # Run the asynchronous tasks
+    results_curr_prompt = loop.run_until_complete(process_all_rows())
+
+    for (assistant_response_content, last_char, completion) in results_curr_prompt:
+        responses.append(assistant_response_content)
+        numbers.append(last_char)
+
+    # Add the new columns to the DataFrame
+    df['LLM_output'] = responses
+    df['LLM_number'] = numbers
+
+    return df
 
 
 if __name__ == '__main__':
