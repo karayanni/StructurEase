@@ -15,4 +15,4 @@ EXPOSE 8080
 ENV STREAMLIT_SERVER_PORT=8080
 
 # Run streamlit when the container launches
-CMD streamlit run app.py  --server.enableCORS false --server.enableXsrfProtection false --server.headless=true --server.maxUploadSize 1000
+CMD streamlit run app_hard_coded.py  --server.enableCORS false --server.enableXsrfProtection false --server.headless=true --server.maxUploadSize 1000
