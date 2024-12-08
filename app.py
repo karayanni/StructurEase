@@ -58,8 +58,8 @@ def main():
         # Input 1: upload CSV file
         df = pd.read_csv(uploaded_file)
 
-        if len(df) < 1000:
-            st.warning("The CSV file must contain at least 1000 rows for StructurEase.")
+        if len(df) < 400:
+            st.warning("The CSV file must contain at least 400 rows for StructurEase.")
             return
 
         st.write("Preview of CSV file:")

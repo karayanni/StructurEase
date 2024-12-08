@@ -85,6 +85,7 @@ def evaluate_manual_to_llm_df(llm_df: pd.DataFrame, classes: list):
     # Compare Helmet_Status_Num with LLM_number
     df['Correct'] = df['Helmet_Status_Num'] == df['LLM_number']
 
+    # Calculate precision, recall, and macro F1 score
     correct_prediction_class = 0
     total_class_observations = 0
     total_class_predictions = 0

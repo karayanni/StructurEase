@@ -211,7 +211,7 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
         asyncio.set_event_loop(loop)
 
     # Explicitly tie the semaphore to the event loop
-    semaphore = asyncio.Semaphore(100)
+    semaphore = asyncio.Semaphore(200)
 
     tasks = []
 
@@ -243,10 +243,11 @@ def ChooseLabelingData(df: pd.DataFrame, column_name: str, current_prompt: dict,
     # Choose up to 10 samples per class
     sampled_indices = []
     sampled_values = []
-    samples_per_class = {'0': [], '1': [], '2': []}
+    samples_per_class = {'0': [], '1': [], '2': [], '3': [], '4': [], '5': [], '6': [], '7': [], '8': [], '9': []}
 
     for i, row, assistant_response_content, last_char, completion, confidence in final_results:
-        if len(samples_per_class[last_char]) >= 10:
+        # todo: return to 10 after playing
+        if len(samples_per_class[last_char]) >= 5:
             continue
         samples_per_class[last_char].append(i)
         sampled_indices.append(i)

@@ -39,7 +39,7 @@ async def extract_classification_number(response: str, system_prompt: str):
     # Function to make the API call
     async def make_completion_request():
         curr_completion = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini-2024-07-18",
             temperature=0,
             top_p=1,
             logprobs=True,
@@ -210,7 +210,7 @@ def evaluate_classification_accuracy_on_entire_DS(system_prompt: str, user_promp
     """
     Evaluate the classification accuracy of LLM's output in the given prompts.
     """
-    labeled_data_file = 'Evaluation/NEISS data/neiss_2023_filtered_2000_rows_labeled_mapped_fixed.csv'
+    labeled_data_file = 'Evaluation/NEISS data/neiss_2023_final_labeled.csv'
     df = pd.read_csv(labeled_data_file)
 
     # df = df.head(1)
@@ -256,7 +256,7 @@ def evaluate_classification_accuracy_on_entire_DS(system_prompt: str, user_promp
     df['Correct'] = df['Helmet_Status_Num'] == df['LLM_number']
 
     # save the output to a file
-    df.to_csv(f"Evaluation/experiment_results/k200SamplingP1/{output_file}.csv", index=False)
+    df.to_csv(f"Evaluation/final_experiment_results/e2e/{output_file}.csv", index=False)
 
     # Calculate accuracy
     total_cases = len(df)

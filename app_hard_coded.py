@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from Evaluation.EvaluateCurrentPromptOnEntireDS import evaluate_classification_accuracy_on_entire_DS, run_classification_on_entire_DS
-from PromptCreationFlow.ChooseLabelingData import ChooseLabelingData
+from PromptCreationFlow.ChooseLabelingData import ChooseLabelingData, ChooseLabelingDataRandom
 from PromptCreationFlow.ClassificationPromptGeneration import InitialGenerateClassificationPrompt
 from PromptCreationFlow.EvaluateCurrentPrompt import EvaluateCurrentPrompt
 from PromptCreationFlow.PromptImprovementStep import ImprovePrompt
@@ -18,8 +18,8 @@ def main():
         # Input 1: upload CSV file
         df = pd.read_csv(uploaded_file)
 
-        if len(df) < 1000:
-            st.warning("The CSV file must contain at least 1000 rows for StructurEase.")
+        if len(df) < 400:
+            st.warning("The CSV file must contain at least 400 rows for StructurEase.")
             return
 
         st.write("Preview of CSV file:")
@@ -53,7 +53,7 @@ def main():
                 with st.form(f"labeling_form_0"):
                     # STEP 2 - Use Current Prompt to Choose Data for Manual Labeling
                     if "sample_0" not in st.session_state:
-                        # evaluate_classification_accuracy_on_entire_DS(st.session_state.current_prompt["system_message"], st.session_state.current_prompt["user_message"], "P_0_classification_k_200")
+                        # evaluate_classification_accuracy_on_entire_DS(st.session_state.current_prompt["system_message"], st.session_state.current_prompt["user_message"], "P_0_e2e")
                         sampled_indices, sampled_values = ChooseLabelingData(df, column_name, st.session_state.current_prompt,
                                                                          st.session_state.already_chosen_data_indices)
                         st.session_state.sample_0 = sampled_values
@@ -101,7 +101,7 @@ def main():
                         if "sample_1" not in st.session_state:
                             # evaluate_classification_accuracy_on_entire_DS(
                             #     st.session_state.current_prompt["system_message"],
-                            #     st.session_state.current_prompt["user_message"], "P_1_classification_k200_sampling_10")
+                            #     st.session_state.current_prompt["user_message"], "P_1_random_6")
 
                             sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
                                                                              st.session_state.current_prompt,
@@ -157,7 +157,7 @@ def main():
 
                             # evaluate_classification_accuracy_on_entire_DS(
                             #     st.session_state.current_prompt["system_message"],
-                            #     st.session_state.current_prompt["user_message"], "P_2_classification_k_200")
+                            #     st.session_state.current_prompt["user_message"], "P_2_7")
 
                             sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
                                                                              st.session_state.current_prompt,
@@ -213,7 +213,7 @@ def main():
 
                             # evaluate_classification_accuracy_on_entire_DS(
                             #     st.session_state.current_prompt["system_message"],
-                            #     st.session_state.current_prompt["user_message"], "P_3_classification_k_200")
+                            #     st.session_state.current_prompt["user_message"], "P_3_e2e")
 
                             sampled_indices, sampled_values = ChooseLabelingData(df, column_name,
                                                                              st.session_state.current_prompt,
@@ -271,10 +271,22 @@ def main():
                         st.session_state.current_prompt["system_message"],
                         st.session_state.current_prompt["user_message"], "final_results")
 
+                    st.session_state.df_with_eval = df_with_eval
                     # preview the df_with_eval and add a button to download the entire CSV file.
+
+                if "df_with_eval" in st.session_state:
                     st.write("Final Classification Results:")
-                    st.write(df_with_eval.head())
-                    st.button("Download Final Classification Results", df_with_eval.to_csv, "final_classification_results.csv")
+
+                    st.write(st.session_state.df_with_eval.head())
+
+                    st.download_button(
+                        label="Download Classification Results",
+                        data=st.session_state.df_with_eval.to_csv(index=False),
+                        # Call the method and generate CSV content
+                        file_name="final_classification_results.csv",
+                        mime="text/csv"  # Set the MIME type
+                    )
+                    # st.download_button("Download Final Classification Results", st.session_state.df_with_eval.to_csv, "final_classification_results.csv")
 
         else:
             st.warning("Please enter at least two qualification classes.")
